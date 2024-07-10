@@ -148,7 +148,7 @@ def check_S_operator(N, n, bs1, bs2, bs3):
 def plot_all(t_list :np.ndarray, result :np.ndarray, result_loss: np.ndarray, result_th_wlabels: list, 
              remove_extreme : None | tuple[int] = None, title:str="Fock state", eps_std:float=None,
              uncoherent_t_loss:float=None, kappa:float=None,
-             show_curves:int=None, losses=True) -> None:
+             show_curves:int=None, losses=True, show_only_th:bool=False) -> None:
     ''' Creates the plots with the given results
     
     Input:
@@ -162,8 +162,9 @@ def plot_all(t_list :np.ndarray, result :np.ndarray, result_loss: np.ndarray, re
         uncoherent_t_loss : float time between losses
         kappa : float             decay rate
         show_curves : None | int       exact solutions for Fock state theoretical curves
+        show_only_th : bool       whether to show only the theoretical results
     '''
-    if (remove_extreme is None):
+    if (remove_extreme is None or show_only_th):
         result_corr = result
         result_loss_corr = result_loss
     else :
@@ -173,7 +174,8 @@ def plot_all(t_list :np.ndarray, result :np.ndarray, result_loss: np.ndarray, re
         result_loss_corr = result_loss[:, np.all(np.logical_and(np.abs(result_loss)<extr_max, 
                                                                 np.abs(result_loss)>extr_min),0)]
     colors = ['green', 'blue', 'pink', 'orange', 'red', 'gray', 'black']
-    plt.errorbar(t_list, np.abs(result_corr.mean(1)), result_corr.std(1), np.zeros_like(t_list), 
+    if not show_only_th:
+        plt.errorbar(t_list, np.abs(result_corr.mean(1)), result_corr.std(1), np.zeros_like(t_list), 
                     barsabove=True, elinewidth=.5,fmt='.',label="VD (3 copies) coherent noise", c=colors[0], capsize=3)
     if losses:
         plt.errorbar(t_list, np.abs(result_loss_corr.mean(1)), result_loss_corr.std(1), np.zeros_like(t_list), 
@@ -190,10 +192,11 @@ def plot_all(t_list :np.ndarray, result :np.ndarray, result_loss: np.ndarray, re
         # only for n=2
         temporary = (np.exp(kappa * t_list_complete)-1)
         VD_3_curve_th = (2+8*temporary**3)/(1+8*temporary**3+temporary**6)
-        plt.plot(t_list_complete, VD_3_curve_th, c=colors[4], linewidth =0.4)
-        VD_4_curve_th = (2+16*temporary**4)/(1+16*temporary**4+temporary**8)
-        plt.plot(t_list_complete, VD_4_curve_th, c=colors[5], linewidth=0.4)
-    plt.title(f"VD efficiency with coherent error ε~N(0,σ), σ={eps_std}"+
+        if n==2: plt.plot(t_list_complete, VD_3_curve_th, c=colors[4], linewidth =0.4)
+        #VD_4_curve_th = (2+16*temporary**4)/(1+16*temporary**4+temporary**8)
+        #if 4 in M_list: plt.plot(t_list_complete, VD_4_curve_th, c=colors[5], linewidth=0.4)
+    plt.title(f"VD efficiency" +
+              (f" with coherent error ε~N(0,σ), σ={eps_std:.2f}" if not show_only_th else "")+
               (f"\nUncoherent loss τ={uncoherent_t_loss}μs" if losses else "")+
               f"\nInitial input : noisy "+title)
     plt.xlabel(f"Time (µs)")
@@ -227,5 +230,12 @@ def plot_wigner(psi, xvec, yvec, fig, ax, cmap, title='Wigner function'):
     rho = qutip.ket2dm(psi)
     wigner = qutip.wigner(rho, xvec, yvec)
     plot = ax.contourf(xvec, yvec, wigner, 100, norm=colors.CenteredNorm(), cmap=cmap)
+    ax.set_title(title)
+    fig.colorbar(plot, ax=ax)
+
+def plot_wigner_3D(psi, xvec, yvec, fig, ax, cmap, title="Wigner"):
+    rho = qutip.ket2dm(psi)
+    wigner = qutip.wigner(rho, xvec, yvec)
+    plot = ax.plot_surface(xvec, yvec, wigner, 100, cmap=cmap)
     ax.set_title(title)
     fig.colorbar(plot, ax=ax)
