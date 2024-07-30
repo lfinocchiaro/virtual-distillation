@@ -234,11 +234,11 @@ def plot_all(t_list :np.ndarray, result :np.ndarray, result_errors: np.ndarray, 
         n = show_curves
         t_list_complete = np.linspace(t_list[0], t_list[-1], 1000)
         no_VD_curve_th = n * np.exp(-kappa * t_list_complete)
-        plt.plot(t_list_complete, no_VD_curve_th, c=colors[3], linewidth = 0.5)
+        plt.plot(t_list_complete, no_VD_curve_th, c=colors[4], linewidth = 0.5)
         # only for n=2
         temporary = (np.exp(kappa * t_list_complete)-1)
         VD_3_curve_th = (2+8*temporary**3)/(1+8*temporary**3+temporary**6)
-        if n==2: plt.plot(t_list_complete, VD_3_curve_th, c=colors[4], linewidth =0.4)
+        if n==2: plt.plot(t_list_complete, VD_3_curve_th, c=colors[3], linewidth =0.4)
         #VD_4_curve_th = (2+16*temporary**4)/(1+16*temporary**4+temporary**8)
         #if 4 in M_list: plt.plot(t_list_complete, VD_4_curve_th, c=colors[5], linewidth=0.4)
     plt.title(f"VD efficiency" +

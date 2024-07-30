@@ -4,6 +4,6 @@ This repository contains the numerical simulations for the virtual distillation 
 
 We also added comparisons with other input states such as binomial, cat and GKP states.
 
-Lastly, we perform some computations on scalability by pushing the protocol to high-mode or high-Fock state.
+All the results are found in the main notebook virtual_distillation.ipynb which walks through everything. The functions are separated in functions.py for clarity.
 
-The notebook virtual_distillation.ipynb walks through everything. The functions in functions.py are separated for clarity.
+In the testing file we perform some computations on scalability by pushing the protocol to high-mode or high-Fock state regimes, as well as some analysis on eigenvector drift.
