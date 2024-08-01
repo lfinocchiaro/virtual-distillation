@@ -225,7 +225,9 @@ def plot_all(t_list :np.ndarray, result :np.ndarray, result_errors: np.ndarray, 
                     barsabove=True, elinewidth=.5,fmt='.',label="VD (3 copies) coherent noise", c=colors[0], capsize=3)
     if (not show_only_th) and ((gamma_loss is not None) or (gamma_dephasing is not None)):
         plt.errorbar(t_list, np.abs(result_errors_corr.mean(1)), result_errors_corr.std(1), np.zeros_like(t_list), 
-                    barsabove=True, elinewidth=.5,fmt='.',label="VD (3 copies) coherent + loss ", c=colors[1], capsize=2)
+                    barsabove=True, elinewidth=.5,fmt='.',
+                    label="VD (3 copies) coherent" + (" + loss " if gamma_loss is not None else "") +(" + dephasing " if gamma_dephasing is not None else ""),
+                    c=colors[1], capsize=2)
     for (i,(result_th, label)) in enumerate(result_th_wlabels):
         plt.scatter(t_list, np.abs(result_th), label=label, marker='+', c=colors[i+3])
     plt.plot(t_list,np.full(t_list.shape,(result_th_wlabels[0][0][0]).real),
