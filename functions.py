@@ -40,22 +40,31 @@ def create_states(N:int, t_list:np.ndarray, rho_0:qutip.qobj.Qobj,
         rho_list.append(rho)
     return rho_list
 
-def create_F3(N:int, sines:np.ndarray, noise:np.ndarray) -> tuple[qutip.qobj.Qobj]:
+def create_F3(N:int, sines:np.ndarray, noise:np.ndarray, prepost:bool=True) -> tuple[qutip.qobj.Qobj]:
     ''' Creates the F3 gate with the given sines and noise on the angles
     
     Input :
        N : int                     dimension of the Hilbert space
        sines : np.ndarray[float]  (size 3) sines of the angles
        noise : np.ndarray[float]  (size 3) noise on the angles
+       prepost : bool             whether to add the redefinitions of the modes before and after the gate
     Output :
-       bs1, bs2, bs3 : qutip.qobj.Qobj  beam splitters 1, 2 and 3'''
-    a1 = qutip.tensor(qutip.destroy(N),  qutip.identity(N), qutip.identity(N))
-    a2 = qutip.tensor(qutip.identity(N), qutip.destroy(N),  qutip.identity(N))
-    a3 = qutip.tensor(qutip.identity(N), qutip.identity(N), qutip.destroy(N))
+       (pre*) bs1, bs2, bs3 (*post): qutip.qobj.Qobj  beam splitters 1, 2 and 3'''
     t1, t2, t3 = np.arcsin(sines) + noise
-    bs1 = (1j*t1*(a1.dag()*a2 + a2.dag()*a1)).expm()
-    bs2 = (1j*t2*(a3.dag()*a2 + a2.dag()*a3)).expm()
-    bs3 = (1j*t3*(a1.dag()*a3 + a3.dag()*a1)).expm()
+    a1daga2 = qutip.tensor(qutip.create(N), qutip.destroy(N))
+    bs1 = qutip.tensor((1j*t1*(a1daga2 + a1daga2.dag())).expm(), qutip.identity(N))
+    a2daga3 = qutip.tensor(qutip.create(N), qutip.destroy(N))
+    bs2 = qutip.tensor(qutip.identity(N), (1j*t2*(a2daga3 + a2daga3.dag())).expm())
+    a1daga3 = qutip.tensor(qutip.create(N), qutip.identity(N), qutip.destroy(N))
+    bs3 = (1j*t3*(a1daga3 + a1daga3.dag())).expm()
+    if prepost:
+        ps1 = (-5j*np.pi/6*qutip.num(N)).expm()
+        ps2 = (-2j*np.pi/3*qutip.num(N)).expm()
+        prephase_op = qutip.tensor(ps1, ps2, qutip.identity(N))
+        ps_end_1 = (-1j*np.pi/2*qutip.num(N)).expm()
+        ps_end_2 = (-1j*np.pi/2*qutip.num(N)).expm()
+        postphase_op = qutip.tensor(ps_end_1, ps_end_2, qutip.identity(N))
+        return prephase_op * bs1, bs2, bs3 * postphase_op
     return bs1, bs2, bs3
 
     # redifining the modes up to global phase (useless)
@@ -251,6 +260,7 @@ def plot_all(t_list :np.ndarray, result :np.ndarray, result_errors: np.ndarray, 
     plt.xlabel(f"Time (µs)")
     plt.ylabel("Expected value")
     plt.legend()
+    plt.grid()
     plt.show()
 
 
@@ -291,6 +301,8 @@ def plot_wigner_3D(psi, xvec, yvec, fig, ax, cmap, title="Wigner", density=False
     else :
         rho = psi
     wigner = qutip.wigner(rho, xvec, yvec)
-    plot = ax.plot_surface(xvec, yvec, wigner, 100, cmap=cmap)
+    X = np.tile(xvec, (len(yvec), 1)).transpose()
+    Y = np.tile(yvec, (len(xvec), 1))
+    plot = ax.plot_surface(X,Y, wigner, cmap=cmap)
     ax.set_title(title)
     fig.colorbar(plot, ax=ax)
