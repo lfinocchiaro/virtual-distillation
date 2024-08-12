@@ -77,7 +77,7 @@ def kraus_op_dephasing(N, l, gamma, nb_copies=1, id_copy=0):
     # for multimode (nb_copies > 1), returns 1 x … x 1 x A_k x … x 1 with A_k in id_copy position
     op = (-gamma*(qutip.num(N)**2)/2).expm()
     op = op * qutip.num(N)**l
-    prefactor = (gamma)**(l/2)/(np.sqrt(math.factorial(l)))
+    prefactor = gamma**(l/2)/np.sqrt(math.factorial(l)) if l<20 else 0
     op = prefactor * op
     return qutip.tensor([qutip.identity(N)]*(id_copy) + [op] + [qutip.identity(N)]*(nb_copies-id_copy-1))
 
