@@ -37,7 +37,7 @@ def create_states(N:int, t_list:np.ndarray, rho_0:qutip.qobj.Qobj,
                 kraus = kraus_op(N, k, t, kappa, nb_copies, id_copy)
                 rho = rho + kraus * rho_init * kraus.dag()
             rho_init = rho
-        rho_list.append(rho)
+        rho_list.append(rho.unit())
     return rho_list
 
 def create_F3(N:int, sines:np.ndarray, noise:np.ndarray, prepost:bool=True) -> tuple[qutip.qobj.Qobj]:
@@ -104,7 +104,7 @@ def create_states_dephasing(N:int, t_list:np.ndarray, rho_0:qutip.qobj.Qobj,
                 kraus = kraus_op_dephasing(N, k, t*kappa, nb_copies, id_copy)
                 rho = rho + kraus * rho_init * kraus.dag()
             rho_init = rho
-        rho_list.append(rho)
+        rho_list.append(rho.unit())
     return rho_list
 
 def perform_protocol(N:int, rho_list : list[qutip.qobj.Qobj], F_list : list[tuple[qutip.qobj.Qobj]],
