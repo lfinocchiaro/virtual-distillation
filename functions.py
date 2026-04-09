@@ -52,10 +52,10 @@ def create_F3(N:int, sines:np.ndarray, noise:np.ndarray, prepost:bool=True) -> t
        (pre*) bs1, bs2, bs3 (*post): qutip.qobj.Qobj  beam splitters 1, 2 and 3'''
     t1, t2, t3 = np.arcsin(sines) + noise
     a1daga2 = qutip.tensor(qutip.create(N), qutip.destroy(N))
-    bs1 = qutip.tensor((1j*t1*(a1daga2 + a1daga2.dag())).expm(), qutip.identity(N))
     a2daga3 = qutip.tensor(qutip.create(N), qutip.destroy(N))
-    bs2 = qutip.tensor(qutip.identity(N), (1j*t2*(a2daga3 + a2daga3.dag())).expm())
     a1daga3 = qutip.tensor(qutip.create(N), qutip.identity(N), qutip.destroy(N))
+    bs1 = qutip.tensor((1j*t1*(a1daga2 + a1daga2.dag())).expm(), qutip.identity(N))
+    bs2 = qutip.tensor(qutip.identity(N), (1j*t2*(a2daga3 + a2daga3.dag())).expm())
     bs3 = (1j*t3*(a1daga3 + a1daga3.dag())).expm()
     if prepost:
         ps1 = (-5j*np.pi/6*qutip.num(N)).expm()
@@ -64,8 +64,8 @@ def create_F3(N:int, sines:np.ndarray, noise:np.ndarray, prepost:bool=True) -> t
         ps_end_1 = (-1j*np.pi/2*qutip.num(N)).expm()
         ps_end_2 = (-1j*np.pi/2*qutip.num(N)).expm()
         postphase_op = qutip.tensor(ps_end_1, ps_end_2, qutip.identity(N))
-        return prephase_op * bs1, bs2, bs3 * postphase_op
-    return bs1, bs2, bs3
+        return prephase_op * bs1, bs3, bs2 * postphase_op # Changed the order to match with the notations in the report
+    return bs1, bs3, bs2 # same
 
     # redifining the modes up to global phase (useless)
 
@@ -107,9 +107,14 @@ def create_states_dephasing(N:int, t_list:np.ndarray, rho_0:qutip.qobj.Qobj,
         rho_list.append(rho.unit())
     return rho_list
 
-def perform_protocol(N:int, rho_list : list[qutip.qobj.Qobj], F_list : list[tuple[qutip.qobj.Qobj]],
-                     M_list : list[int] =[3,4,1], losses:bool=False, losses_gamma:float=0,
-                     dephasing:bool= False, dephasing_gamma :float = 1,
+def perform_protocol(N:int,
+                     rho_list : list[qutip.qobj.Qobj], 
+                     F_list : list[tuple[qutip.qobj.Qobj]],
+                     M_list : list[int] =[3,4,1], 
+                     losses: None | str = None, 
+                     losses_gamma:float | list[float]=0,
+                     dephasing : None | str = None, 
+                     dephasing_gamma :float | list[float] = 1,
                      print_progression:bool = False)-> tuple[np.ndarray]:
     ''' Performs the full 3-mode VD protocol on each input state and for each noisy F_3 gate
     Returns the 2-dimensional array with all results. Also returns theoretical results for comparison (see plots)
@@ -120,10 +125,10 @@ def perform_protocol(N:int, rho_list : list[qutip.qobj.Qobj], F_list : list[tupl
        rho_list : list[qutip.qobj.Qobj]  (size n)  list of input states
        F_list :   list[tuple[qutip.qobj.Qobj]]  (size m) list of noisy beam splitters forming the F_3 gate
        M_list :   list[int]              (size k) list of nb_modes for theoretical results
-       losses :   bool                   whether to include losses in the simulation
-       losses_gamma : float         if losses=True, compute with losses γ=κτ
-       dephasing : bool                   whether to include dephasing errors
-       dephasing_gamma : float            if dephasing=True, compute with the dephasing γ=κ_φ τ
+       losses :   string   (None|"single"|"multiple") whether to include losses in the simulation
+       losses_gamma : float | list       if losses != None, compute with losses γ=κτ (each mode has different losses if losses="multiple")
+       dephasing : string  (None|"single"|"multiple")  whether to include dephasing errors
+       dephasing_gamma : float | list    if dephasing != None, compute with the dephasing γ=κ_φ τ (different values if dephasing="multiple")
        print_progression : bool           whether to print the progression of the simulation
        
     Output :
@@ -155,16 +160,30 @@ def perform_protocol(N:int, rho_list : list[qutip.qobj.Qobj], F_list : list[tupl
             denominator = qutip.expect(denominator_op, rho_tilde)
             result[i,j]=(numerator/denominator)
             # WITH losses and/or dephasing
-            if losses or dephasing:
+            if losses or dephasing: # can have both
                 rho_1 = bs3 * rho_full * bs3.dag()
-                if dephasing : rho_1 = create_states_dephasing(N, [1], rho_1, dephasing_gamma, 3)[0]
-                if losses : rho_1 = create_states(N, [1], rho_1, losses_gamma, 3)[0]
+                g_phi = dephasing_gamma
+                g_loss = losses_gamma
+                if dephasing :
+                    if (dephasing=="multiple") : g_phi = dephasing_gamma[2]
+                    rho_1 = create_states_dephasing(N, [1], rho_1, g_phi, 3)[0]
+                if losses :
+                    if (losses=="multiple") : g_loss = losses_gamma[2]
+                    rho_1 = create_states(N, [1], rho_1, g_loss, 3)[0]
                 rho_2 = bs2 * rho_1 * bs2.dag()
-                if dephasing : rho_2 = create_states_dephasing(N, [1], rho_2, dephasing_gamma, 3)[0]
-                if losses : rho_2 = create_states(N, [1], rho_2, losses_gamma, 3)[0]
+                if dephasing :
+                    if (dephasing=="multiple") : g_phi = dephasing_gamma[1]
+                    rho_2 = create_states_dephasing(N, [1], rho_2, g_phi, 3)[0]
+                if losses :
+                    if (losses=="multiple") : g_loss = losses_gamma[2]
+                    rho_2 = create_states(N, [1], rho_2, g_loss, 3)[0]
                 rho_3 = bs1 * rho_2 * bs1.dag()
-                if dephasing : rho_3 = create_states_dephasing(N, [1], rho_3, dephasing_gamma, 3)[0]
-                if losses : rho_3 = create_states(N, [1], rho_3, losses_gamma, 3)[0]
+                if dephasing :
+                    if (dephasing=="multiple") : g_phi = dephasing_gamma[0]
+                    rho_3 = create_states_dephasing(N, [1], rho_3, g_phi, 3)[0]
+                if losses :
+                    if (losses=="multiple") : g_loss = losses_gamma[0]
+                    rho_3 = create_states(N, [1], rho_3, g_loss, 3)[0]
                 result_errors[i,j] = qutip.expect(numerator_op, rho_3)/qutip.expect(denominator_op, rho_3)
         # theoretical results
         for (k, nb_mode) in enumerate(M_list):
@@ -188,14 +207,14 @@ def check_S_operator(N, n, bs1, bs2, bs3):
     denominator_op = (2j*np.pi/3*(n1+2*n2)).expm()
     F3 = bs1*bs2*bs3
     S3 = F3.dag() * denominator_op * F3
-    print(S3.check_isunitary()) # this should be equal to the shift operator
+    print(S3.isunitary) # this should be equal to the shift operator
 
     for i in range(3):
         x = [n-1 if i==0 else n, n-1 if i==1 else n, n-1 if i==2 else n]
         for j in range(3):
             y = [n-1 if j==0 else n, n-1 if j==1 else n, n-1 if j==2 else n]
             print(f"<{x[0]}{x[1]}{x[2]}|S|{y[0]}{y[1]}{y[2]}> = ",
-                abs(((qutip.fock([N,N,N],x).dag() * S3 * qutip.fock([N,N,N],y)).data.toarray()[0][0])))
+                abs(((qutip.fock([N,N,N],x).dag() * S3 * qutip.fock([N,N,N],y)) ))) #.data.toarray()[0][0])))
             
 
 def plot_all(t_list :np.ndarray, result :np.ndarray, result_errors: np.ndarray, result_th_wlabels: list, 
