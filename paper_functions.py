@@ -49,6 +49,12 @@ def dephasing_channel(N:int, dephasing_rate:float, t:float) -> qutip.Qobj:
     return channel
 
 
+
+
+def create_noisy_list(N, channel_type, rate, t_list, rho_pure_list):
+    loss_channel_list = [channel_type(N, rate, t) for t in t_list]
+    return [ ([channel(rho) for channel in loss_channel_list], label) for (rho, label) in rho_pure_list]
+
 def virtual_distillation_expectation_value(N:int, rho: qutip.Qobj, observable: qutip.Qobj, M: int) -> float:
     """Returns the expectation value of an observable after M-mode virtual distillation of a state rho.
 
@@ -62,6 +68,25 @@ def virtual_distillation_expectation_value(N:int, rho: qutip.Qobj, observable: q
         float: expectation value of the observable after virtual distillation.
     """
     return (observable * rho**M).tr() / (rho**M).tr()
+
+
+
+def perform_protocol(N, rho_noisy_list, M_list, observable):
+    ''' Perform the virtual distillation protocol 
+    Input:
+        N: Hilbert space dimension of one bosonic mode (truncated at N-1 excitations)
+        rho_noisy_list: list of tuples (rho_noisy, label)
+        M_list: list of tuples (M, label)
+    Output:
+        results: array of shape (len(rho_noisy_list), len(M_list), len'''
+
+    results = np.zeros((len(rho_noisy_list), len(M_list), len(rho_noisy_list[0][0])), dtype='complex')
+    for i, (rho_noisy, _) in enumerate(rho_noisy_list):
+        for j, (M, _) in enumerate(M_list):
+            for k, rho in enumerate(rho_noisy):
+                results[i,j,k] = virtual_distillation_expectation_value(N, rho, observable, M)
+    return results
+
 
 
 def plot_theoretical_results(fig, ax, results: np.ndarray, rho_noisy_list: list, M_list: list, t_list: np.ndarray, observable_label: str, noise: tuple, plot_params: dict) -> None:
@@ -106,9 +131,9 @@ def plot_theoretical_results(fig, ax, results: np.ndarray, rho_noisy_list: list,
         ax[i].xaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
         ax[i].yaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
         
-        ax[i].text( -0.15, 0.95, plot_params['labels'][i],
+        ax[i].text( -0.182, 1.03, plot_params['labels'][i],
             transform=ax[i].transAxes,
-            fontsize=20,
+            fontsize=35,
             verticalalignment='top')
 
     if plot_params['show_wigner']:
@@ -126,14 +151,15 @@ def plot_theoretical_results(fig, ax, results: np.ndarray, rho_noisy_list: list,
 
         for i, (state_list, _) in enumerate(rho_noisy_list):
             # Create inset
-            axins = inset_axes(ax[i],width="35%", height="35%",loc="lower left")  # [x, y, width, height] in axes fraction
+            axins = ax[i].inset_axes([0.01, 0.01, 0.35, 0.35]) #width="35%", height="35%",loc="lower left")  # [x, y, width, height] in axes fraction
             axins.set_aspect('equal', adjustable='box')
             # trick
             wigner_list[i][0,0] = vmax
             wigner_list[i][-1,-1] = vmin
             im = axins.contourf(xvec, yvec, wigner_list[i],100,cmap=plot_params['wigner_cmap'],vmin=vmin,vmax=vmax)
             if i==plot_params['idx_wigner_colorbar']:
-                cax = inset_axes(axins,width="5%", height="100%",loc="lower left",bbox_to_anchor=(1.05, 0, 1, 1),bbox_transform=axins.transAxes,borderpad=0)
+                cax = axins.inset_axes([1.05,0,0.05,1])
+                #cax = inset_axes(axins,width="5%", height="100%",loc="lower left",bbox_to_anchor=(1.05, 0, 1, 1),bbox_transform=axins.transAxes,borderpad=0)
                 #norm = mcolors.Normalize(vmin=vmin, vmax=vmax, clip=False)
                 #cb = plt.colorbar(cmap= plot_params['wigner_cmap'], norm=norm, cax=cax)
                 #dummy_im = axins.contourf(xvec, yvec, wigner_list[i], alpha=0.6, cmap=plot_params['wigner_cmap'], vmin=vmin, vmax=vmax)
