@@ -111,13 +111,14 @@ def plot_theoretical_results(fig, ax, results: np.ndarray, rho_noisy_list: list,
         plt.xlabel(f'$\\{noise[1]} t$', fontsize=25)
         plt.ylabel(observable_label, fontsize=25)
         plt.title(state_label, fontsize=25)
+        legend_font_size = plot_params.get('legend_font_size', 15)
         if plot_params['legend_loc'] == 'outside right' and i==0:
-            plt.legend(loc= "lower center", fontsize=15)
+            plt.legend(loc= "lower center", fontsize=legend_font_size)
             plt.legend(loc= 'center left', bbox_to_anchor=(3.4,0.5),fontsize=15)
         elif plot_params['legend_loc'] == 'inside last' and i==results.shape[0]-1:
-            ax[i].legend(loc="upper right",fontsize=15)
-        elif plot_params['legend_loc'] == 'inside bottom':
-            ax[i].legend(loc="lower left",fontsize=15)
+            ax[i].legend(loc="upper right",fontsize=legend_font_size)
+        elif plot_params['legend_loc'] == 'inside bottom' and i==0:
+            ax[i].legend(loc="lower left",fontsize=legend_font_size)
 
         plt.xlim(plot_params['xmin'], plot_params['xmax'])
 
