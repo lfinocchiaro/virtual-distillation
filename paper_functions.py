@@ -360,13 +360,90 @@ def perform_protocol_errors(N:int,
             print("*", end="") if print_progression else None
             # apply the F_3 gate
             bs1, bs2, bs3 = F_list[i][j]
-            F3 = bs1 * bs2 * bs3 # no losses in between beam splitters
-            rho = F3 * rho * F3.dag()
-            # compute the expectation values
             for gate in (bs3, bs2, bs1):
                 rho = gate * rho * gate.dag()
                 rho = apply_loss_channel(N, rho, interleaved_time, kappa_arr[i,j], 3)
                 rho = apply_dephasing_channel(N, rho, interleaved_time, gamma_arr[i,j], 3)
             result[i,j] = qutip.expect(operators[0], rho)/qutip.expect(operators[1], rho)
     return result
+
+def create_V_phi(N, angles, noise):
+    a1daga2 = qutip.tensor(qutip.create(N), qutip.destroy(N))
+    alpha1, alpha2, alpha3 = angles + noise # alpha3==alpha1 but we keep it for clarity
+
+    p1 = qutip.tensor([qutip.identity(N), qutip.identity(N), (1j * np.pi * qutip.num(N)).expm()])
+    b1 = qutip.tensor([qutip.identity(N), (alpha1*(- a1daga2 + a1daga2.dag())).expm()]) # actually a2daga3 but it’s the same
+    p2 = qutip.tensor([qutip.identity(N), (1j * np.pi * qutip.num(N)).expm(), qutip.identity(N)])
+    b2 = qutip.tensor([(alpha2*(- a1daga2 + a1daga2.dag())).expm(), qutip.identity(N)])
+    p3 = qutip.tensor([qutip.identity(N), qutip.identity(N), (1j * np.pi/2 * qutip.num(N)).expm()])
+    b3 = qutip.tensor([qutip.identity(N), (alpha3*(- a1daga2 + a1daga2.dag())).expm()]) # actually a2daga3 but it’s the same
+
+
+    pfinal = qutip.tensor([qutip.identity(N), (1j * np.pi/3 * qutip.num(N)).expm(), (-1j * 5*np.pi/6 * qutip.num(N)).expm()])
+
+    #return p1 * b1 * p1.dag(), p2 * b2 * p2.dag(), p3 * b1 * p3.dag() * pfinal
+    return pfinal.dag() * p3 * b3.dag() * p3.dag() , p2 * b2.dag() * p2.dag() , p1 * b1.dag() * p1.dag()
+
+def create_V_phi_list(N:int, angles:np.ndarray, noise_list:np.ndarray, print_progress:bool=False) -> list[list[tuple[qutip.qobj.Qobj]]]:
+    ''' Creates a list of V_phi gates with noise on the angles '''
+
+    V_list = [] # list of all F gates (triplets of beam splitters)
+    for i in range(len(noise_list)):
+        print(f"({i+1}/{len(noise_list)})", end=" ") if print_progress else None
+        V_line = []
+        for noise in noise_list[i]:
+            print("*", end="") if print_progress else None
+            # Here we create the F3 gates with the noisy angles
+            V_line.append(create_V_phi(N, angles, noise))
+        V_list.append(V_line)
+    return V_list
+
+
+def check_V_operator(N, n, V_phi, L_phi):
+    ''' Check the properties of the V operator'''
+
+    S3 = V_phi.dag() * L_phi * V_phi
+    print(S3.isunitary) # this should be equal to the shift operator
+
+    for i in range(3):
+        x = [n-1 if i==0 else n, n-1 if i==1 else n, n-1 if i==2 else n]
+        for j in range(3):
+            y = [n-1 if j==0 else n, n-1 if j==1 else n, n-1 if j==2 else n]
+            print(f"<{x[0]}{x[1]}{x[2]}|S|{y[0]}{y[1]}{y[2]}> = {
+                (((qutip.fock([N,N,N],x).dag() * S3 * qutip.fock([N,N,N],y)) )):.5f}") #.data.toarray()[0][0])))
+            
+def check_Hilbert_truncation(N):
+    rho_ex = apply_loss_channel(N, qutip.fock_dm(N,2), 80, [0.002]) # qutip.ket2dm((qutip.coherent(N, 1.5) + qutip.coherent(N, -1.5)).unit())
+
+    num_th = ((1j*np.pi*qutip.num(N)).expm() * rho_ex**3).tr()
+    den_th = (rho_ex**3).tr()
+
+    a, b, c = create_V_phi(N, [np.pi/4, np.arccos(1/np.sqrt(3)), np.pi/4], np.zeros(3))
+    V_phi = a * b * c
+    L_phi = qutip.tensor([(1j * np.pi * qutip.num(N)).expm(), (-1j * np.pi/3 * qutip.num(N)).expm(), (1j * np.pi/3 * qutip.num(N)).expm()])
+    #L_phi = qutip.tensor([-qutip.identity(N), (-2j * np.pi/3 * qutip.num(N)).expm(), (2j * np.pi/3 * qutip.num(N)).expm()])
+    den_op = qutip.tensor([(2j * np.pi/3 * qutip.num(N)).expm(), (4j * np.pi/3 * qutip.num(N)).expm(), qutip.identity(N)])
+
+    initial_sin_angles = np.sqrt((1/2,1/2,1/3)) # exact values
+    d, e, f = create_F3(N, initial_sin_angles, np.zeros(3))
+
+    rho_ex_3 = qutip.tensor(rho_ex, rho_ex, rho_ex)
+    rho_ex_3_bis = qutip.tensor(rho_ex, rho_ex, rho_ex)
+
+    for gate in (c, b, a):
+        rho_ex_3 = gate * rho_ex_3 * gate.dag()
+        # rho_ex_3 = apply_loss_channel(N, rho_ex_3, 0, [0,0,0], 3)
+        # rho_ex_3 = apply_dephasing_channel(N, rho_ex_3, 0,[0,0,0], 3)
+
+    for gate in (f, e, d):
+        rho_ex_3_bis = gate * rho_ex_3_bis * gate.dag()
+
+    #(L_phi *V_phi * rho_ex_3 * V_phi.dag()).tr()
+    #check_V_operator(N, 2, V_phi, L_phi)
+    num_ex = (L_phi * rho_ex_3).tr()
+    den_ex = (den_op * rho_ex_3_bis).tr()
+    if np.isclose(num_th, num_ex) and np.isclose(den_th, den_ex):
+        print(f"Theoretical and numerical results match for N={N}")
+    else:
+        print(f"Theoretical and numerical results do not match for N={N}")
 
