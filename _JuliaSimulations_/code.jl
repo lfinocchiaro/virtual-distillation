@@ -46,7 +46,7 @@ function U_tot(U,ϕ)
     S₂ = Matrix(I,2m,2m)[vcat(m+1:2m, 1:m),:] ## swap the first m rows with the last m rows 
     Φ=cat(exp(im*diagm(ϕ)),Matrix(I,m,m),dims=(1,2))
 
-    return V=U₂'*Φ*U₂*S₂
+    return U₂'*Φ*S₂*U₂
 end
 
 function CF(ϕ,U,x;Samples=10^6)
@@ -142,7 +142,9 @@ function CF_thermal(ϕ,U,β;Samples=10^6)
         states=rand(bosonic_dist, 2m)
         num += glynn_estimator(V_num.*Thermal_Gram(states), rand([-1, 1], 2m))
         den += glynn_estimator(V_den.*Thermal_Gram(states), rand([-1, 1], 2m))
-    end
+    end    
+    num=num/Samples
+    den=den/Samples
 
     return num/den
 end
@@ -158,6 +160,7 @@ function calc_n1n2_thermal(δ,U,β; num_samples=10^6)
     chi_4 = -CF_thermal([-δ;-δ;zeros(m-2)],U,β;Samples=num_samples)
     
     numerator = chi_1 + chi_2 + chi_3 + chi_4
+    
     
     return real(numerator / denom)
 end
